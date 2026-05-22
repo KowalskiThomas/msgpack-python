@@ -185,18 +185,21 @@ def unpackb(object packed, *, object object_hook=None, object list_hook=None,
     if max_ext_len == -1:
         max_ext_len = buf_len
 
+    cdef object trailing = None
     try:
         init_ctx(&ctx, object_hook, object_pairs_hook, list_hook, ext_hook,
                  use_list, raw, timestamp, strict_map_key, cerr,
                  max_str_len, max_bin_len, max_array_len, max_map_len, max_ext_len)
         ret = unpack_construct(&ctx, buf, buf_len, &off)
+        if ret == 1 and off < buf_len:
+            trailing = PyBytes_FromStringAndSize(buf + off, buf_len - off)
     finally:
         PyBuffer_Release(&view);
 
     if ret == 1:
         obj = unpack_data(&ctx)
-        if off < buf_len:
-            raise ExtraData(obj, PyBytes_FromStringAndSize(buf+off, buf_len-off))
+        if trailing is not None:
+            raise ExtraData(obj, trailing)
         return obj
     unpack_clear(&ctx)
     if ret == 0:
